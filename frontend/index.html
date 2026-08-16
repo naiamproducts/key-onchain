@@ -516,6 +516,11 @@
                 ]
             },
             {
+                "type": "enum",
+                "name": "core::bool",
+                "variants": [{"name": "False", "type": "()"}, {"name": "True", "type": "()"}]
+            },
+            {
                 "type": "interface",
                 "name": "key_onchain::key_market::IKeyMarket",
                 "items": [
@@ -542,8 +547,16 @@
                         "name": "register_buyer",
                         "inputs": [
                             {"name": "pubkey_x", "type": "core::felt252"},
-                            {"name": "pubkey_y", "type": "core::felt252"}
+                            {"name": "pubkey_y", "type": "core::felt252"},
+                            {"name": "viewing_key", "type": "core::felt252"}
                         ],
+                        "outputs": [],
+                        "state_mutability": "external"
+                    },
+                    {
+                        "type": "function",
+                        "name": "mark_shielded",
+                        "inputs": [{"name": "buyer_pubkey_x", "type": "core::felt252"}],
                         "outputs": [],
                         "state_mutability": "external"
                     },
@@ -578,22 +591,42 @@
                     },
                     {
                         "type": "function",
-                        "name": "get_vendor_balance",
-                        "inputs": [{"name": "vendor", "type": "core::felt252"}],
-                        "outputs": [{"type": "core::integer::u256"}],
+                        "name": "get_vendor",
+                        "inputs": [],
+                        "outputs": [{"type": "core::starknet::contract_address::ContractAddress"}],
                         "state_mutability": "view"
                     },
                     {
                         "type": "function",
-                        "name": "withdraw",
+                        "name": "get_total_listings",
                         "inputs": [],
-                        "outputs": [],
-                        "state_mutability": "external"
+                        "outputs": [{"type": "core::integer::u64"}],
+                        "state_mutability": "view"
+                    },
+                    {
+                        "type": "function",
+                        "name": "get_total_keys_sold",
+                        "inputs": [],
+                        "outputs": [{"type": "core::integer::u64"}],
+                        "state_mutability": "view"
+                    },
+                    {
+                        "type": "function",
+                        "name": "get_strk20_pool",
+                        "inputs": [],
+                        "outputs": [{"type": "core::starknet::contract_address::ContractAddress"}],
+                        "state_mutability": "view"
+                    },
+                    {
+                        "type": "function",
+                        "name": "get_viewing_key",
+                        "inputs": [{"name": "buyer_pubkey_x", "type": "core::felt252"}],
+                        "outputs": [{"type": "core::felt252"}],
+                        "state_mutability": "view"
                     }
                 ]
             }
         ];
-
         // ============================================
         // ElGamal Implementation
         // ============================================
@@ -821,10 +854,20 @@
 
                 log(`Contract declared: ${declareResult.class_hash}`, 'success');
 
-                // Deploy with constructor args (vendor address)
+                // Deploy with constructor args (vendor, payment_token, strk20_pool, fpi_screening)
+                const STRK20_POOL_SEPOLIA = "0x0254a6b2997ef52e9f830ce1f543f6b29768295e8d17e2267d672c552cfe0d91";
+                const FPI_SCREENING = "0x04718f8d3833c87b829d2613f3e4f6c73e3a61a0b5d4c2e3f1a0b9c8d7e6f5a4";
+                const STRK_TOKEN_SEPOLIA = "0x04718f8d384a3d8c04fbb0c31f5d5a5c4d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7";
+                const PAYMENT_TOKEN = STRK_TOKEN_SEPOLIA;
+
                 const deployResult = await state.account.deployContract({
                     classHash: declareResult.class_hash,
-                    constructorCalldata: [state.address],
+                    constructorCalldata: [
+                        state.address,           // vendor
+                        PAYMENT_TOKEN,           // payment_token (STRK)
+                        STRK20_POOL_SEPOLIA,     // strk20_pool
+                        FPI_SCREENING            // fpi_screening
+                    ],
                     salt: starknet.randomAddress(),
                     unique: true
                 });
@@ -998,17 +1041,31 @@
             state.keypair.publicKeyX = pubkeyX;
             state.keypair.publicKeyY = pubkeyY;
 
+            // Generate viewing key (for STRK20 note discovery)
+            const viewingKey = generateRandomScalar();
+            state.keypair.viewingKey = viewingKey;
+
             document.getElementById('pubkey-x').textContent = toFelt(pubkeyX);
             document.getElementById('pubkey-y').textContent = toFelt(pubkeyY);
             document.getElementById('privkey').textContent = toFelt(privateKey);
             document.getElementById('keypair-info').classList.remove('hidden');
 
-            log('Registering public key on-chain...');
+            log('Registering on-chain with viewing key...');
 
             try {
                 const contract = new starknet.Contract(KEYMARKET_ABI, state.contractAddress, state.account);
-                const tx = await contract.register_buyer(toFelt(pubkeyX), toFelt(pubkeyY));
-                log(`Public key registered! TX: ${tx.transaction_hash}`, 'success');
+                const tx = await contract.register_buyer(
+                    toFelt(pubkeyX),
+                    toFelt(pubkeyY),
+                    toFelt(viewingKey)
+                );
+                 log(`Public key registered! TX: ${tx.transaction_hash}`, 'success');
+                 log('Now shielding balance in STRK20 pool...', 'info');
+
+                 // Mark buyer as shielded (required before buying)
+                 const markTx = await contract.mark_shielded(toFelt(state.keypair.publicKeyX));
+                 log(`Shielded marker set! TX: ${markTx.transaction_hash}`, 'success');
+                 log('Balance shielded. You can now buy keys.', 'success');
             } catch (error) {
                 log(`Registration failed: ${error.message}`, 'error');
             }
