@@ -2,6 +2,14 @@
 
 Confidential key distribution on Starknet. The transfer amount IS the secret key.
 
+## Live Demo
+
+```
+https://distribution-breathing-checkout-rebecca.trycloudflare.com
+```
+
+**⚠️ Cloudflare tunnel is temporary. Install [Ready wallet](https://readywallet.app) browser extension for full STRK20 support.**
+
 ## How It Works
 
 ```
