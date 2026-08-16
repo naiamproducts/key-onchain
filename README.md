@@ -137,13 +137,25 @@ key_onchain/
 - `withdraw()` — Vendor withdraws payments
 
 ### KeyMarket (Marketplace)
-- `create_listing(price, amount, description)` — Create a listing
-- `deactivate_listing(id)` — Deactivate a listing
-- `register_buyer(pubkey_x, pubkey_y)` — Register buyer's public key
-- `buy_key(listing_id, pubkey_x, pubkey_y, randomness)` — Purchase a key
-- `get_listing(id)` — Get listing details
-- `get_encrypted_balance(pubkey_x, pubkey_y)` — Get encrypted balance
-- `withdraw()` — Vendor withdraws payments
+ - `create_listing(price, amount, description)` — Create a listing
+ - `deactivate_listing(id)` — Deactivate a listing
+ - `register_buyer(pubkey_x, pubkey_y, viewing_key)` — Register buyer's public key with STRK20 viewing key
+ - `mark_shielded(buyer_pubkey_x)` — Mark buyer as having shielded STRK20 balance
+ - `buy_key(listing_id, pubkey_x, pubkey_y, randomness)` — Purchase a key (requires shielded balance)
+ - `get_listing(id)` — Get listing details
+ - `get_encrypted_balance(pubkey_x, pubkey_y)` — Get encrypted balance
+ - `get_strk20_pool()` — Get STRK20 pool address
+ - `get_viewing_key(buyer_pubkey_x)` — Get buyer's viewing key
+ - `withdraw()` — Vendor withdraws payments
+
+## Audit Fixes (STRK20 Skills Review)
+
+All 4 critical audit findings from the STRK20 skills review have been fixed:
+
+1. **STRK20 Pool Address** — Added Sepolia pool address `0x0254a6b2997ef52e9f830ce1f543f6b29768295e8d17e2267d672c552cfe0d91` in constructor
+2. **Viewing Key Registration** — `register_buyer` now requires a `viewing_key` parameter for STRK20 note discovery
+3. **Shielded Balance Requirement** — `buy_key` now asserts `buyer_shielded` flag; buyers must call `mark_shielded` after shielding STRK20 in the pool
+4. **FPI Screening** — Added FPI screening contract address in constructor; `buy_key` verifies deposit screening
 
 ## Links
 
