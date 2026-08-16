@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  # Main development environment
+  dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-dev
+    volumes:
+      - ..:/app
+      - scarb-cache:/root/.cache/scarb
+      - snforge-cache:/root/.cache/snforge
+    ports:
+      - "5050:5050"
+      - "8080:8080"
+    environment:
+      - SCARB_CACHE=/root/.cache/scarb
+      - SNFORGE_CACHE=/root/.cache/snforge
+    stdin_open: true
+    tty: true
+    command: bash
+
+  # Starknet devnet for local testing
+  devnet:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-devnet
+    volumes:
+      - ..:/app
+      - scarb-cache:/root/.cache/scarb
+    ports:
+      - "5050:5050"
+      - "8080:8080"
+    environment:
+      - STARKNET_DEVNET_PORT=5050
+    command: >
+      bash -c "echo 'Starting Starknet Devnet...' &&
+               starknet-devnet --host 0.0.0.0 --port 5050 --seed 12345"
+
+  # Run tests
+  test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-test
+    volumes:
+      - ..:/app
+      - scarb-cache:/root/.cache/scarb
+      - snforge-cache:/root/.cache/snforge
+    environment:
+      - SCARB_CACHE=/root/.cache/scarb
+      - SNFORGE_CACHE=/root/.cache/snforge
+    command: bash docker/scripts/run-tests.sh
+
+  # Build contracts
+  build:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-build
+    volumes:
+      - ..:/app
+      - scarb-cache:/root/.cache/scarb
+    command: bash docker/scripts/build.sh
+
+  # Seller interface
+  seller:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-seller
+    volumes:
+      - ..:/app
+      - scarb-cache:/root/.cache/scarb
+    ports:
+      - "5050:5050"
+    environment:
+      - RPC_URL=http://devnet:5050
+      - CONTRACT_ADDRESS=${CONTRACT_ADDRESS:-}
+    stdin_open: true
+    tty: true
+    command: bash docker/scripts/seller.sh
+    depends_on:
+      - devnet
+
+  # Buyer interface
+  buyer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-buyer
+    volumes:
+      - ..:/app
+      - scarb-cache:/root/.cache/scarb
+    ports:
+      - "5051:5050"
+    environment:
+      - RPC_URL=http://devnet:5050
+      - CONTRACT_ADDRESS=${CONTRACT_ADDRESS:-}
+    stdin_open: true
+    tty: true
+    command: bash docker/scripts/buyer.sh
+    depends_on:
+      - devnet
+
+  # Deploy to Sepolia testnet
+  deploy-sepolia:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-deploy-sepolia
+    volumes:
+      - ..:/app
+      - scarb-cache:/root/.cache/scarb
+      - starknet-accounts:/root/.starknet_accounts
+    environment:
+      - STARKNET_PRIVATE_KEY=${STARKNET_PRIVATE_KEY:-}
+      - STARKNET_ACCOUNT_ADDRESS=${STARKNET_ACCOUNT_ADDRESS:-}
+      - VENDOR_ADDRESS=${VENDOR_ADDRESS:-}
+    command: bash docker/scripts/deploy-sepolia.sh
+
+  # Demo on local devnet
+  demo:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-demo
+    volumes:
+      - ..:/app
+      - scarb-cache:/root/.cache/scarb
+    environment:
+      - RPC_URL=http://devnet:5050
+    command: bash docker/scripts/demo.sh
+    depends_on:
+      - devnet
+
+volumes:
+  scarb-cache:
+  snforge-cache:
+  starknet-accounts:
