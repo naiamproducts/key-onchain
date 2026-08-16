@@ -259,11 +259,11 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>RPC URL</label>
-                    <input type="text" id="rpc-url" value="http://localhost:5050" placeholder="http://localhost:5050">
+                    <input type="text" id="rpc-url" value="https://starknet-sepolia.public.blastapi.io/rpc/v0_7" placeholder="https://starknet-sepolia.public.blastapi.io/rpc/v0_7">
                 </div>
                 <div class="form-group">
                     <label>Chain ID</label>
-                    <input type="text" id="chain-id" value="SN_LOCAL" readonly>
+                    <input type="text" id="chain-id" value="SN_SEPOLIA" readonly>
                 </div>
             </div>
             <div class="flex-row">
@@ -465,7 +465,7 @@
             wallet: null,
             account: null,
             address: null,
-            chainId: 'SN_LOCAL',
+            chainId: 'SN_SEPOLIA',
             contractAddress: null,
             listings: [],
             selectedListing: null,
@@ -677,7 +677,7 @@
             try {
                 state.provider = new starknet.RpcProvider({
                     nodeUrl: rpcUrl,
-                    chainId: 'SN_LOCAL'
+                    chainId: 'SN_SEPOLIA'
                 });
 
                 const chainId = await state.provider.getChainId();
