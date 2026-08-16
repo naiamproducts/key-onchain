@@ -454,8 +454,23 @@
         </div>
     </div>
 
-    <!-- starknet.js from CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/starknet@6.14.1/dist/starknet.bundle.min.js"></script>
+    <!-- starknet.js v10.4.0 from CDN -->
+    <script type="module">
+        // Import starknet.js 10.4.0+ for WalletAccountV6 support
+        import { RpcProvider, Contract, WalletAccountV6, stark } from 'https://esm.sh/starknet@10.4.0';
+        import { getStarknet } from 'https://esm.sh/@starknet-io/get-starknet-discovery@6.0.3';
+        
+        window.starknet = {
+            RpcProvider,
+            Contract,
+            WalletAccountV6,
+            stark,
+            getStarknet
+        };
+        
+        // Signal that SDK is loaded
+        window.dispatchEvent(new CustomEvent('starknet-sdk-loaded'));
+    </script>
     <script>
         // ============================================
         // State
