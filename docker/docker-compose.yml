@@ -136,6 +136,33 @@ services:
     depends_on:
       - devnet
 
+  # Frontend server
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-frontend
+    volumes:
+      - ..:/app
+    ports:
+      - "3000:3000"
+    command: bash docker/scripts/serve-frontend.sh
+
+  # Full lab: devnet + frontend + cloudflare tunnel
+  full-lab:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: keyonchain-full-lab
+    volumes:
+      - ..:/app
+    ports:
+      - "5050:5050"
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+    command: bash docker/scripts/start-full-lab.sh
+
 volumes:
   scarb-cache:
   snforge-cache:

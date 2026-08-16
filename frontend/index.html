@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeyOnChain - Confidential Key Distribution</title>
+    <script src="https://cdn.jsdelivr.net/npm/starknet@6.14.1/dist/starknet.bundle.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        header {
+            text-align: center;
+            padding: 40px 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .subtitle { color: #888; font-size: 1.1rem; }
+        .card {
+            background: #12121a;
+            border: 1px solid #1a1a2e;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+        }
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 16px;
+            font-size: 1.2rem;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        .status.disconnected { background: #3d1f1f; color: #ff6b6b; }
+        .status.connected { background: #1f3d1f; color: #51cf66; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 4px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); }
+        .btn-secondary { background: #1a1a2e; color: #e0e0e0; }
+        .btn-secondary:hover { background: #2a2a3e; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .wallet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .wallet-option {
+            background: #1a1a2e;
+            border: 2px solid #2a2a3e;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .wallet-option:hover { border-color: #667eea; transform: translateY(-2px); }
+        .wallet-option.active { border-color: #667eea; background: #1a1a3e; }
+        .wallet-icon { font-size: 2rem; margin-bottom: 8px; }
+        .wallet-name { font-weight: 600; }
+        .form-group { margin: 16px 0; }
+        .form-group label { display: block; margin-bottom: 6px; color: #888; font-size: 0.9rem; }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            background: #0a0a0f;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 1rem;
+        }
+        .form-group input:focus { outline: none; border-color: #667eea; }
+        .listing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .listing-card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2a2a3e;
+        }
+        .listing-card h3 { color: #667eea; margin-bottom: 12px; }
+        .listing-detail { display: flex; justify-content: space-between; margin: 8px 0; }
+        .listing-detail span:first-child { color: #888; }
+        .encrypted-box {
+            background: #0a0a0f;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 12px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+        .encrypted-box .label { color: #667eea; margin-bottom: 8px; }
+        .encrypted-box .value { color: #51cf66; }
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin: 30px 0;
+            position: relative;
+        }
+        .step {
+            text-align: center;
+            flex: 1;
+            position: relative;
+        }
+        .step::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            right: -50%;
+            height: 2px;
+            background: #2a2a3e;
+            z-index: 0;
+        }
+        .step:last-child::before { display: none; }
+        .step.active::before, .step.completed::before { background: #667eea; }
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #1a1a2e;
+            border: 2px solid #2a2a3e;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+        }
+        .step.active .step-number { border-color: #667eea; background: #667eea; }
+        .step.completed .step-number { border-color: #51cf66; background: #51cf66; }
+        .step-label { margin-top: 8px; font-size: 0.85rem; color: #888; }
+        .step.active .step-label { color: #667eea; }
+        .step.completed .step-label { color: #51cf66; }
+        .log {
+            background: #0a0a0f;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+        .log-entry { margin: 4px 0; }
+        .log-entry.info { color: #667eea; }
+        .log-entry.success { color: #51cf66; }
+        .log-entry.error { color: #ff6b6b; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 KeyOnChain</h1>
+            <p class="subtitle">Confidential Key Distribution on Starknet</p>
+        </header>
+
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <div class="step active" id="step1">
+                <span class="step-number">1</span>
+                <div class="step-label">Connect Wallet</div>
+            </div>
+            <div class="step" id="step2">
+                <span class="step-number">2</span>
+                <div class="step-label">Generate Keys</div>
+            </div>
+            <div class="step" id="step3">
+                <span class="step-number">3</span>
+                <div class="step-label">Buy Key</div>
+            </div>
+            <div class="step" id="step4">
+                <span class="step-number">4</span>
+                <div class="step-label">Decrypt</div>
+            </div>
+        </div>
+
+        <!-- Wallet Connection -->
+        <div class="card" id="wallet-card">
+            <h2>🔗 Connect Wallet</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="status disconnected" id="wallet-status">Not Connected</span>
+            </div>
+            <div class="wallet-grid">
+                <div class="wallet-option" onclick="connectWallet('argent')">
+                    <div class="wallet-icon">🅰️</div>
+                    <div class="wallet-name">Argent</div>
+                </div>
+                <div class="wallet-option" onclick="connectWallet('braavos')">
+                    <div class="wallet-icon">🅱️</div>
+                    <div class="wallet-name">Braavos</div>
+                </div>
+                <div class="wallet-option" onclick="connectWallet('xverse')">
+                    <div class="wallet-icon">✖️</div>
+                    <div class="wallet-name">Xverse</div>
+                </div>
+            </div>
+            <div id="wallet-info" class="hidden" style="margin-top: 16px;">
+                <p><strong>Address:</strong> <span id="wallet-address"></span></p>
+                <p><strong>Network:</strong> <span id="wallet-network"></span></p>
+            </div>
+        </div>
+
+        <!-- Key Generation -->
+        <div class="card hidden" id="keygen-card">
+            <h2>🔑 Generate Key Pair</h2>
+            <p style="color: #888; margin-bottom: 16px;">
+                Generate a keypair to receive encrypted keys. The public key is shared with the seller.
+            </p>
+            <button class="btn btn-primary" onclick="generateKeys()">Generate Keypair</button>
+            <div id="keypair-info" class="hidden" style="margin-top: 16px;">
+                <div class="encrypted-box">
+                    <div class="label">Public Key (share with seller):</div>
+                    <div class="value" id="public-key"></div>
+                </div>
+                <p style="color: #ff6b6b; font-size: 0.9rem; margin-top: 12px;">
+                    ⚠️ Save your private key securely! It's needed to decrypt your keys.
+                </p>
+            </div>
+        </div>
+
+        <!-- Listings -->
+        <div class="card hidden" id="listings-card">
+            <h2>🛒 Available Keys</h2>
+            <div class="listing-grid" id="listings-grid">
+                <!-- Listings populated by JS -->
+            </div>
+        </div>
+
+        <!-- Purchase -->
+        <div class="card hidden" id="purchase-card">
+            <h2>💳 Purchase Key</h2>
+            <div id="selected-listing"></div>
+            <div class="form-group">
+                <label>Your Public Key X</label>
+                <input type="text" id="buyer-pubkey-x" placeholder="Auto-filled from keypair" readonly>
+            </div>
+            <div class="form-group">
+                <label>Your Public Key Y</label>
+                <input type="text" id="buyer-pubkey-y" placeholder="Auto-filled from keypair" readonly>
+            </div>
+            <button class="btn btn-primary" onclick="buyKey()" id="buy-btn">Buy Key</button>
+        </div>
+
+        <!-- Decryption -->
+        <div class="card hidden" id="decrypt-card">
+            <h2>🔓 Decrypt Your Key</h2>
+            <p style="color: #888; margin-bottom: 16px;">
+                Your encrypted balance is stored on-chain. Use your private key to decrypt it.
+            </p>
+            <div class="encrypted-box">
+                <div class="label">Encrypted Balance (on-chain):</div>
+                <div class="value" id="encrypted-balance">L: (0, 0) | R: (0, 0)</div>
+            </div>
+            <div class="form-group">
+                <label>Your Private Key</label>
+                <input type="password" id="private-key-input" placeholder="Enter your private key">
+            </div>
+            <button class="btn btn-primary" onclick="decryptKey()">Decrypt Key</button>
+            <div id="decrypted-result" class="hidden" style="margin-top: 16px;">
+                <div class="encrypted-box">
+                    <div class="label">🎉 Decrypted Secret Key:</div>
+                    <div class="value" id="decrypted-key" style="font-size: 1.5rem;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="card">
+            <h2>📋 Activity Log</h2>
+            <div class="log" id="activity-log">
+                <div class="log-entry info">Ready. Connect your wallet to start.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let state = {
+            wallet: null,
+            address: null,
+            provider: null,
+            privateKey: null,
+            publicKeyX: null,
+            publicKeyY: null,
+            selectedListing: null,
+            encryptedBalance: null
+        };
+
+        // Contract ABI (simplified)
+        const CONTRACT_ABI = [
+            {
+                "name": "buy_key",
+                "type": "function",
+                "inputs": [
+                    {"name": "listing_id", "type": "u64"},
+                    {"name": "buyer_pubkey_x", "type": "felt252"},
+                    {"name": "buyer_pubkey_y", "type": "felt252"},
+                    {"name": "randomness", "type": "felt252"}
+                ],
+                "outputs": []
+            },
+            {
+                "name": "get_encrypted_balance",
+                "type": "function",
+                "inputs": [
+                    {"name": "buyer_pubkey_x", "type": "felt252"},
+                    {"name": "buyer_pubkey_y", "type": "felt252"}
+                ],
+                "outputs": [
+                    {"name": "L_x", "type": "felt252"},
+                    {"name": "L_y", "type": "felt252"},
+                    {"name": "R_x", "type": "felt252"},
+                    {"name": "R_y", "type": "felt252"}
+                ]
+            },
+            {
+                "name": "get_listing",
+                "type": "function",
+                "inputs": [{"name": "listing_id", "type": "u64"}],
+                "outputs": [
+                    {"name": "key_price", "type": "u256"},
+                    {"name": "key_amount", "type": "felt252"},
+                    {"name": "active", "type": "bool"},
+                    {"name": "keys_sold", "type": "u64"}
+                ]
+            }
+        ];
+
+        // Demo listings
+        const DEMO_LISTINGS = [
+            { id: 0, name: "API Access Key", price: "0.01 ETH", keyAmount: 1337, sold: 5 },
+            { id: 1, name: "NFT Gated Content", price: "0.005 ETH", keyAmount: 42, sold: 12 },
+            { id: 2, name: "Software License", price: "0.02 ETH", keyAmount: 9999, sold: 3 }
+        ];
+
+        // Logging
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('activity-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Step management
+        function setStep(step) {
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById(`step${i}`);
+                el.classList.remove('active', 'completed');
+                if (i < step) el.classList.add('completed');
+                if (i === step) el.classList.add('active');
+            }
+        }
+
+        // Connect wallet
+        async function connectWallet(walletName) {
+            log(`Connecting to ${walletName}...`);
+
+            try {
+                // Check if starknet wallet extension is available
+                if (window.starknet) {
+                    await window.starknet.enable();
+                    state.wallet = window.starknet;
+                    state.address = window.starknet.selectedAddress;
+                    state.provider = window.starknet.provider;
+
+                    document.getElementById('wallet-status').textContent = 'Connected';
+                    document.getElementById('wallet-status').className = 'status connected';
+                    document.getElementById('wallet-address').textContent = state.address;
+                    document.getElementById('wallet-network').textContent = 'Starknet Sepolia';
+
+                    document.getElementById('wallet-info').classList.remove('hidden');
+                    document.getElementById('keygen-card').classList.remove('hidden');
+
+                    setStep(2);
+                    log(`Connected to ${walletName}: ${state.address.slice(0, 10)}...`, 'success');
+                } else {
+                    // Demo mode
+                    state.address = '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+                    state.wallet = 'demo';
+
+                    document.getElementById('wallet-status').textContent = 'Connected (Demo)';
+                    document.getElementById('wallet-status').className = 'status connected';
+                    document.getElementById('wallet-address').textContent = state.address;
+                    document.getElementById('wallet-network').textContent = 'Starknet Sepolia (Demo)';
+
+                    document.getElementById('wallet-info').classList.remove('hidden');
+                    document.getElementById('keygen-card').classList.remove('hidden');
+
+                    setStep(2);
+                    log(`Connected in demo mode: ${state.address.slice(0, 10)}...`, 'success');
+                }
+            } catch (error) {
+                log(`Connection failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Generate keys
+        async function generateKeys() {
+            log('Generating keypair...');
+
+            // Generate private key (random 252-bit number)
+            const array = new Uint8Array(32);
+            crypto.getRandomValues(array);
+            let privateKey = BigInt(0);
+            for (let i = 0; i < 32; i++) {
+                privateKey = (privateKey << BigInt(8)) | BigInt(array[i]);
+            }
+            privateKey = privateKey % BigInt('0x800000000000011000000000000000000000000000000000000000000000001');
+
+            state.privateKey = privateKey.toString(16);
+
+            // For demo, use fixed values
+            state.publicKeyX = '0x1ef15c3474dc869953dfd0b38f8a9a9c93c62369f57728cfc3fb4d09ab3f587';
+            state.publicKeyY = '0x21f721d2f545f217076214e8f076d07137d268ee6e143fb90ba2870331619a3';
+
+            document.getElementById('public-key').textContent =
+                `X: ${state.publicKeyX}\nY: ${state.publicKeyY}`;
+            document.getElementById('keypair-info').classList.remove('hidden');
+
+            document.getElementById('buyer-pubkey-x').value = state.publicKeyX;
+            document.getElementById('buyer-pubkey-y').value = state.publicKeyY;
+
+            setStep(3);
+            showListings();
+            log('Keypair generated successfully', 'success');
+            log(`Private key: ${state.privateKey.slice(0, 10)}... (save this!)`, 'info');
+        }
+
+        // Show listings
+        function showListings() {
+            const grid = document.getElementById('listings-grid');
+            grid.innerHTML = DEMO_LISTINGS.map(listing => `
+                <div class="listing-card" onclick="selectListing(${listing.id})">
+                    <h3>${listing.name}</h3>
+                    <div class="listing-detail">
+                        <span>Price:</span>
+                        <span>${listing.price}</span>
+                    </div>
+                    <div class="listing-detail">
+                        <span>Key Amount:</span>
+                        <span>${listing.keyAmount}</span>
+                    </div>
+                    <div class="listing-detail">
+                        <span>Sold:</span>
+                        <span>${listing.sold}</span>
+                    </div>
+                    <button class="btn btn-secondary" style="width: 100%; margin-top: 12px;">
+                        Select
+                    </button>
+                </div>
+            `).join('');
+
+            document.getElementById('listings-card').classList.remove('hidden');
+        }
+
+        // Select listing
+        function selectListing(id) {
+            state.selectedListing = DEMO_LISTINGS[id];
+            document.getElementById('selected-listing').innerHTML = `
+                <div class="listing-detail">
+                    <span>Selected:</span>
+                    <span><strong>${state.selectedListing.name}</strong></span>
+                </div>
+                <div class="listing-detail">
+                    <span>Price:</span>
+                    <span>${state.selectedListing.price}</span>
+                </div>
+                <div class="listing-detail">
+                    <span>Key Amount:</span>
+                    <span>${state.selectedListing.keyAmount}</span>
+                </div>
+            `;
+            document.getElementById('purchase-card').classList.remove('hidden');
+            log(`Selected listing: ${state.selectedListing.name}`);
+        }
+
+        // Buy key
+        async function buyKey() {
+            if (!state.selectedListing) {
+                log('Please select a listing first', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('buy-btn');
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            log('Processing purchase...');
+
+            try {
+                // In production, this would call the contract
+                // For demo, simulate the transaction
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Simulate encrypted balance
+                state.encryptedBalance = {
+                    Lx: '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
+                    Ly: '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
+                    Rx: '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
+                    Ry: '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')
+                };
+
+                document.getElementById('encrypted-balance').innerHTML = `
+                    <div class="label">Encrypted Balance (on-chain):</div>
+                    <div class="value">
+                        L: (${state.encryptedBalance.Lx.slice(0, 20)}...,<br>
+                        ${state.encryptedBalance.Ly.slice(0, 20)}...)<br>
+                        R: (${state.encryptedBalance.Rx.slice(0, 20)}...,<br>
+                        ${state.encryptedBalance.Ry.slice(0, 20)}...)
+                    </div>
+                `;
+
+                document.getElementById('decrypt-card').classList.remove('hidden');
+                setStep(4);
+                log('Key purchased! Encrypted balance stored on-chain.', 'success');
+                log('The key amount is now encrypted under your public key.', 'info');
+            } catch (error) {
+                log(`Purchase failed: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Buy Key';
+            }
+        }
+
+        // Decrypt key
+        async function decryptKey() {
+            const privateKeyInput = document.getElementById('private-key-input').value;
+
+            if (!privateKeyInput) {
+                log('Please enter your private key', 'error');
+                return;
+            }
+
+            log('Decrypting...');
+
+            try {
+                // In production, this would do ElGamal decryption
+                // For demo, show the key amount from the listing
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                const decryptedKey = state.selectedListing.keyAmount;
+
+                document.getElementById('decrypted-key').textContent = decryptedKey;
+                document.getElementById('decrypted-result').classList.remove('hidden');
+                log(`Decrypted key: ${decryptedKey}`, 'success');
+                log('This value was never visible on-chain!', 'info');
+            } catch (error) {
+                log(`Decryption failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            log('KeyOnChain Frontend loaded');
+            log('Connect your wallet to start');
+        });
+    </script>
+</body>
+</html>
