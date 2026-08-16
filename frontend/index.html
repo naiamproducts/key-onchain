@@ -259,7 +259,7 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>RPC URL</label>
-                    <input type="text" id="rpc-url" value="https://starknet-sepolia.public.blastapi.io/rpc/v0_7" placeholder="https://starknet-sepolia.public.blastapi.io/rpc/v0_7">
+                    <input type="text" id="rpc-url" value="https://starknet-sepolia.public.blastapi.io/rpc/v0_7" readonly>
                 </div>
                 <div class="form-group">
                     <label>Chain ID</label>
@@ -267,30 +267,41 @@
                 </div>
             </div>
             <div class="flex-row">
-                <span class="status disconnected" id="network-status">Not Connected</span>
-                <button class="btn btn-secondary" onclick="connectNetwork()">Connect to Network</button>
+                <span class="status connected" id="network-status">Sepolia Connected</span>
+                <button class="btn btn-secondary" onclick="connectNetwork()">Reconnect</button>
             </div>
         </div>
 
         <!-- Wallet Connection -->
-        <div class="card hidden" id="wallet-card">
+        <div class="card" id="wallet-card">
             <h2>🔗 Connect Wallet</h2>
             <div class="flex-row" style="margin-bottom: 16px;">
                 <span class="status disconnected" id="wallet-status">Not Connected</span>
                 <span id="wallet-address" class="hidden" style="font-family: monospace; color: #888;"></span>
             </div>
             <div class="wallet-grid">
-                <div class="wallet-option" onclick="connectWallet('argent')">
-                    <div class="wallet-icon">🅰️</div>
-                    <div class="wallet-name">Argent</div>
-                </div>
                 <div class="wallet-option" onclick="connectWallet('braavos')">
                     <div class="wallet-icon">🅱️</div>
                     <div class="wallet-name">Braavos</div>
                 </div>
+                <div class="wallet-option" onclick="connectWallet('argent')">
+                    <div class="wallet-icon">🅰️</div>
+                    <div class="wallet-name">Argent</div>
+                </div>
+                <div class="wallet-option" onclick="connectWallet('ready')">
+                    <div class="wallet-icon">🟢</div>
+                    <div class="wallet-name">Ready</div>
+                </div>
+                <div class="wallet-option" onclick="connectWallet('xverse')">
+                    <div class="wallet-icon">✖️</div>
+                    <div class="wallet-name">Xverse</div>
+                </div>
             </div>
             <p style="margin-top: 16px; color: #888; font-size: 0.9rem;">
-                Install Argent or Braavos wallet extension to connect.
+                Install Braavos, Argent, Ready, or Xverse wallet extension to connect.
+            </p>
+            <p style="margin-top: 8px; color: #667eea; font-size: 0.9rem;">
+                Recommended: Install the <strong>Ready wallet</strong> browser extension for full STRK20 support.
             </p>
         </div>
 
@@ -723,11 +734,17 @@
                     return;
                 }
 
-                // Use getStarknet from discovery package
+                 // Use getStarknet from discovery package
                 const { getStarknet } = window.starknet;
+                const integrationMap = {
+                    'braavos': 'braavos',
+                    'argent': 'argent',
+                    'ready': 'ready',
+                    'xverse': 'xverse'
+                };
                 const connected = await getStarknet({
                     // @ts-ignore
-                    integrations: [walletName === 'xverse' ? 'xverse' : walletName === 'braavos' ? 'braavos' : 'argent']
+                    integrations: [integrationMap[walletName] || 'argent']
                 });
 
                 if (connected && connected.account) {
@@ -1102,10 +1119,23 @@
         // ============================================
         document.addEventListener('DOMContentLoaded', () => {
             log('KeyOnChain Frontend loaded');
-            log('Step 1: Connect to network first');
+            log('Network: Starknet Sepolia (auto-connected)');
+
+            // Auto-connect to network on load
+            connectNetwork();
+
+            // Show wallet and deploy cards immediately
+            setTimeout(() => {
+                document.getElementById('wallet-card').classList.remove('hidden');
+                document.getElementById('deploy-card').classList.remove('hidden');
+                document.getElementById('create-listing-card').classList.remove('hidden');
+                document.getElementById('listings-card').classList.remove('hidden');
+                document.getElementById('register-card').classList.remove('hidden');
+                setStep(2);
+            }, 1000);
 
             // Check for existing wallet
-            if (window.starknet) {
+            if (window.starknet && window.starknet.getStarknet) {
                 log('Detected Starknet wallet extension', 'info');
             }
         });
