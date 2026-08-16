@@ -332,8 +332,8 @@
             </p>
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Key Price (wei)</label>
-                    <input type="text" id="listing-price" placeholder="1000000000000000000" value="1000000000000000000">
+                    <label>Key Price (STRK)</label>
+                    <input type="text" id="listing-price" placeholder="1.0" value="1.0">
                 </div>
                 <div class="form-group">
                     <label>Key Amount (secret value)</label>
@@ -815,17 +815,20 @@
                 return;
             }
 
-            const price = document.getElementById('listing-price').value;
+            const priceStrk = document.getElementById('listing-price').value;
             const amount = document.getElementById('listing-amount').value;
             const desc = document.getElementById('listing-desc').value;
 
-            log(`Creating listing: price=${price}, amount=${amount}...`);
+            // Convert STRK to wei (18 decimals)
+            const priceWei = BigInt(Math.floor(parseFloat(priceStrk) * 1e18));
+
+            log(`Creating listing: price=${priceStrk} STRK, amount=${amount}...`);
 
             try {
                 const contract = new starknet.Contract(KEYMARKET_ABI, state.contractAddress, state.account);
 
                 const tx = await contract.create_listing(
-                    { low: BigInt(price), high: 0n },
+                    { low: priceWei, high: 0n },
                     BigInt(amount),
                     BigInt(desc)
                 );
@@ -860,6 +863,8 @@
                         const [price, keyAmount, active, keysSold] = await contract.get_listing(i);
 
                         if (active) {
+                            // Convert wei to STRK for display
+                            const priceStrk = (Number(price.low) / 1e18).toFixed(2);
                             const card = document.createElement('div');
                             card.className = 'listing-card';
                             card.onclick = () => selectListing(i, price, keyAmount);
@@ -867,7 +872,7 @@
                                 <h3>Listing #${i}</h3>
                                 <div class="listing-detail">
                                     <span>Price:</span>
-                                    <span>${price.low} wei</span>
+                                    <span>${priceStrk} STRK</span>
                                 </div>
                                 <div class="listing-detail">
                                     <span>Key Amount:</span>
@@ -902,6 +907,9 @@
             document.querySelectorAll('.listing-card').forEach(c => c.classList.remove('selected'));
             event.currentTarget.classList.add('selected');
 
+            // Convert wei to STRK for display
+            const priceStrk = (Number(price.low) / 1e18).toFixed(2);
+
             document.getElementById('selected-listing').innerHTML = `
                 <div class="listing-detail">
                     <span>Selected Listing:</span>
@@ -909,7 +917,7 @@
                 </div>
                 <div class="listing-detail">
                     <span>Price:</span>
-                    <span>${price.low} wei</span>
+                    <span>${priceStrk} STRK</span>
                 </div>
                 <div class="listing-detail">
                     <span>Key Amount (hidden on-chain):</span>
