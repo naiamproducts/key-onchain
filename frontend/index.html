@@ -691,8 +691,7 @@
 
             try {
                 state.provider = new starknet.RpcProvider({
-                    nodeUrl: rpcUrl,
-                    chainId: 'SN_SEPOLIA'
+                    nodeUrl: rpcUrl
                 });
 
                 const chainId = await state.provider.getChainId();
@@ -718,12 +717,29 @@
             log(`Connecting to ${walletName}...`);
 
             try {
-                // Check for Starknet wallet
-                if (window.starknet) {
-                    await window.starknet.enable();
-                    state.wallet = window.starknet;
-                    state.account = window.starknet.account;
-                    state.address = window.starknet.selectedAddress;
+                if (!window.starknet || !window.starknet.getStarknet) {
+                    log('Please install a Starknet wallet (Argent, Braavos, Xverse)', 'error');
+                    alert('Please install a Starknet wallet (Argent, Braavos, or Xverse) to continue.');
+                    return;
+                }
+
+                // Use getStarknet from discovery package
+                const { getStarknet } = window.starknet;
+                const connected = await getStarknet({
+                    // @ts-ignore
+                    integrations: [walletName === 'xverse' ? 'xverse' : walletName === 'braavos' ? 'braavos' : 'argent']
+                });
+
+                if (connected && connected.account) {
+                    state.account = connected.account;
+                    state.address = connected.account.address;
+
+                    // Check capability with version query (never a data call)
+                    const versions = await state.account.supportedWalletApi();
+                    const supported = versions.some(v => v >= "0.10.3");
+                    if (!supported) {
+                        log('Wallet does not support STRK20 Wallet API >= 0.10.3', 'error');
+                    }
 
                     document.getElementById('wallet-status').textContent = 'Connected';
                     document.getElementById('wallet-status').className = 'status connected';
@@ -752,8 +768,7 @@
 
                     log(`Connected: ${state.address.slice(0, 10)}...`, 'success');
                 } else {
-                    log('No Starknet wallet found. Please install Argent or Braavos.', 'error');
-                    alert('Please install a Starknet wallet (Argent or Braavos) to continue.');
+                    log('Wallet connection cancelled', 'error');
                 }
             } catch (error) {
                 log(`Wallet connection failed: ${error.message}`, 'error');
